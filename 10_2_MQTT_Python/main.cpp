@@ -2,6 +2,8 @@
 #include "MQTTNetwork.h"
 #include "MQTTmbed.h"
 #include "MQTTClient.h"
+//
+        #include "stm32l475e_iot01_accelero.h"
 
 // GLOBAL VARIABLES
 WiFiInterface *wifi;
@@ -15,7 +17,11 @@ const char* topic = "Mbed";
 
 Thread mqtt_thread(osPriorityHigh);
 EventQueue mqtt_queue;
-
+//
+        int16_t pDataXYZ[3] = {0};
+        int idR[32] = {0};
+        int indexR = 0;
+//
 void messageArrived(MQTT::MessageData& md) {
     MQTT::Message &message = md.message;
     char msg[300];
@@ -32,7 +38,16 @@ void publish_message(MQTT::Client<MQTTNetwork, Countdown>* client) {
     message_num++;
     MQTT::Message message;
     char buff[100];
-    sprintf(buff, "QoS0 Hello, Python! #%d", message_num);
+
+    //
+        printf("Start accelerometer init\n");
+        
+        BSP_ACCELERO_Init();
+
+        BSP_ACCELERO_AccGetXYZ(pDataXYZ);
+        sprintf(buff, "%d, %d, %d\n", pDataXYZ[0], pDataXYZ[1], pDataXYZ[2]);
+
+ //   sprintf(buff, "QoS0 Hello, Python! #%d", message_num);
     message.qos = MQTT::QOS0;
     message.retained = false;
     message.dup = false;
@@ -47,7 +62,9 @@ void publish_message(MQTT::Client<MQTTNetwork, Countdown>* client) {
 void close_mqtt() {
     closed = true;
 }
+//
 
+//
 int main() {
 
     wifi = WiFiInterface::get_default_instance();
@@ -98,7 +115,8 @@ int main() {
     }
 
     mqtt_thread.start(callback(&mqtt_queue, &EventQueue::dispatch_forever));
-    btn2.rise(mqtt_queue.event(&publish_message, &client));
+    mqtt_queue.call_every(500ms, publish_message, &client);
+    
     //btn3.rise(&close_mqtt);
 
     int num = 0;
